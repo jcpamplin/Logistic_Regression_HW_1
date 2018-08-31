@@ -1,3 +1,34 @@
+libname logreg 'C:\Users\JCP\Documents\Logistic_Regression\data';
+
+proc means data = logreg.insurance_t printalltypes; 
+run;
+
+/* gives really good distrobutions */
+proc surveymeans data = logreg.insurance_t; 
+run;
+
+/* checking variable importance */
+proc hpsplit data=logreg.insurance_t maxdepth=10;
+ target ins;
+ input AGE ATM ATMAMT BRANCH CASHBK CC CCBAL CCPURC CD CDBAL CHECKS CRSCORE DDA DDABAL DEP DEPAMT DIRDEP HMOWN HMVAL ILS ILSBAL INAREA INCOME INV INVBAL IRA IRABAL LOC LOCBAL LORES MM MMBAL MMCRED MOVED MTG MTGBAL NSF NSFAMT PHONE POS POSAMT RES SAV SAVBAL SDB TELLER ACCTAGE;
+ output importance=import;
+ prune none;
+run;
+
+proc print data=import(where=(itype='Import'));
+run;
+
+
+/* data table creation */ 
+proc sql;
+	create table rec_values as
+	select DDABAL, DEPAMT, CHECKS, NSFAMT, SAVBAL, ATMAMT, POS, POSAMT, CDBAL, IRABAL, LOCBAL, INVBAL, ILSBAL, MMBAL, MTGBAL, CCBAL, INCOME, HMVAL, AGE, CRSCORE, INS
+	from logreg.insurance_t;
+quit;
+
+
+
+
 /*-----------------------------------*/
 /*   MSA 2019: Logistic Regression   */
 /*    Intro to Logistic Regression   */
