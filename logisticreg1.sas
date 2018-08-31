@@ -2,7 +2,7 @@
 /*   MSA 2019: Logistic Regression   */
 /*    Intro to Logistic Regression   */
 /*                                   */
-/*          Matthew Austin           */
+/*         Lauren Murray            */
 /*-----------------------------------*/
 libname logistic 'C:\Users\14lmu\OneDrive\Documents\LogisticRegressionData\MSA2019LogisticData\data';
 run;
