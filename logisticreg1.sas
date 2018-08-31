@@ -109,4 +109,4 @@ proc logistic data=quasisep;
 	title 'quasi-complete separation';
 run;
 
-#Is this change working?
+*Is this change working?;
