@@ -1,9 +1,19 @@
+%let path = C:\Users\Andy Dotter\Documents\Fall_2018\Fall_1\Logistic Regression\Data;
+
+libname logistic "&path";
 /*Get a simple summary to identify binary vs. continuous and maximums*/
+ods rtf file='temp.rtf';
+
 proc means data=Logistic.Insurance_t N Nmiss Mean stddev Min Max;
 	run;
+ods rtf close;
 /*look at some of the distributions, what about outliers*/
 proc univariate data=Logistic.Insurance_t;
-	var _Numeric_;
+	var CCBAL;
+	histogram CCBAL / normal kernel;
+   inset n mean std  / position=ne;
+   title "Credit Card Balance Distribution Analysis";
+run;
 	histogram;
 run;
 /*Gives distributions of all variables*/
@@ -50,7 +60,7 @@ proc sql;
 	from logistic.insurance_t;
 quit;
 /*Start with all suggested*/
-proc logistic data=log_dataset;
+proc logistic data=logistic.insurance_t;
 	Class BRANCH(ref='B1')/
 	model INS(event='1') = ACCTAGE AGE BRANCH CCBAL CDBAL CRSCORE DDABAL HMVAL ILSBAL INCOME INVBAL IRABAL LOCBAL NSFAMT/ plcl plrl;
 	title 'Original Logistic Model';
@@ -62,8 +72,8 @@ proc logistic data=logistic.insurance_t;
 run;
 /*uses no-missing no zero table*/
 proc logistic data=logistic.insurance_t;
-	class BRANCH Res;
-	model INS(event='1') = DDABAL BRANCH DDA ACCTAGE AGE CRSCORE INCOME LORES HMVAL DEP RES DEPAMT HMOWN INAREA;
+	class BRANCH;
+	model INS(event='1') = DDABAL BRANCH DDA ACCTAGE AGE CRSCORE INCOME LORES HMVAL DEP DEPAMT HMOWN INAREA;
 run;
 quit;
 
@@ -94,7 +104,7 @@ run;
 title;
 /*Further reduce*/
 proc logistics data=logistic.insurance_t;
-	model INS(event='1') = CCBAL POSAMT SAVBAL DDABAL DEP TELLER NSF DIRDEP/ plcl plrl;
+	model INS(event='1') = DDABAL DEP INAREA/ plcl plrl;
 	title 'Round four';
 run;
 title;
@@ -105,12 +115,12 @@ proc logistics data=logistic.insurance_t;
 	model INS(event='1') = Acctage--INAREA /selection=backwards;
 run;
 /*forward selection*/
-proc logistics data=logistic.insurance_t;
+proc logistic data=logistic.insurance_t;
 	model INS(event='1') = Acctage--INAREA /selection=forward;
 run;
 /*score selection*/
 /* I like this because it give the best model for each # of variables. You can plot the increase in accuracy and see where you get diminishing returns*/
-proc logistics data=logistic.insurance_t;
+proc logistic data=logistic.insurance_t;
 	model INS(event='1') = Acctage--INAREA /selection=score best=1;
 run;
 /* This leaves in variables that may be correlated with each other, need to run tests to determine*/
@@ -133,4 +143,8 @@ proc logistic data=invest_grouping;
 run;
 proc logistic data=invest_grouping;
 	model INS(event='1') = ACCTAGE DDABAL DEP PHONE TELLER SAVBAL ATMAMT Num_all_acct;
+run;
+/*Final Model*/
+proc logistic data=logistic.insurance_t;
+	model INS(event='1') = ATMAMT CC CD DDA DEP INV IRA MM MTG TELLER SAV;
 run;
