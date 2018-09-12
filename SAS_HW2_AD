@@ -1,0 +1,131 @@
+%let path = C:\Users\Andy Dotter\Documents\Fall_2018\Fall_1\Logistic Regression\Data;
+libname logistic "&path";
+%let FinalModVar =  ATMAMT DDABAL CC CD DEP INV IRA MM MTG TELLER SAV;
+/*** SELECTION METHODS***/
+proc logistic data=logistic.insurance_t;
+	model INS(event='1') = Acctage--INAREA Acctage*INAREA/selection=score best=1;
+run;
+proc logistic data=logistic.insurance_t;
+	model INS(event='1') = Acctage--INAREA Acctage*INAREA/selection=backwards;
+run;
+proc logistic data=logistic.insurance_t plots=none;
+	model INS(event='1') = Acctage--INAREA Acctage*INAREA/selection=forward;
+run;
+/*Final Model*/
+proc logistic data=logistic.insurance_t;
+	model INS(event='1') = &FinalModVar;
+run;
+/************ CHECK FOR INTERACTIONS**************/
+proc univariate data=logistic.insurance_t plots = all;
+	var &FinalModVar;
+run;
+/*Check for interactions amoungst the largets effects*/
+/*appears that DDABAL*CC and CD*IRA have interactions that are stisticall significant!*/
+/*What other interactions could we see logicall?*/
+proc logistic data=logistic.insurance_t;
+	model INS(event='1') = ATMAMT DDABAL CC CD DDA DEP INV IRA MM MTG TELLER SAV CD*MM CD*IRA DDABAL*CC DDABAL*IRA;
+run;
+/********************CHECK FOR OUTLIERS/INFLUENTIAL POINTS***************************/
+/*Check influential points cooks d, leverage, chi-squared*/
+proc logistic data=logistic.insurance_t plots(MAXPOINTS=NONE)= (influence, dfbetas, dpc, phat);
+	model INS(event='1') = &FinalModVar;
+run;
+/*Check oultiers using dfbetas*/
+/*proc logistic data=logistic.insurance_t plots(MAXPOINTS=NONE)=dfbetas;
+	model INS(event='1') = ATMAMT DDABAL CC CD DDA DEP INV IRA MM MTG TELLER SAV;
+run;*/
+
+/*********************LINEARITY*************************************/
+/*** using GAMs to check linearity ***/
+/*Check if there is another way to check linearity*/
+/*We need to review the distributions, do we think any of these variables have a non-linear relationship with the dependent variables*/
+proc gam data=logistic.insurance_t plots=components(clm additive commonaxes);
+	/* "clm" displays conf limits */
+	/* "additive" displays the estimated function f(lwt) */
+	/* you can leave off the "additive" part to see the "nonlinear" effect and how much it deviates from 0 */
+	/* param() is where you put linear effects
+	spline() is where you put the nonlinear ones. more df = more complex function */
+	/*model low(event='1') = param(lwt smoke race) spline(age, df=4) / dist=binomial link=logit;*/
+	model INS(event='1') = param(&FinalModVar) /dist=binomial link=logit;
+run;
+/***PARTIAL RESIDUALS, Continuous Variables***/
+proc logistic data=logistic.insurance_t;
+	model INS(event='1') = &FinalModVar;
+	output out=predicted reschi=respearson pred=phat predprobs=x;
+run;
+/******* SUBSET DATA TO IGNORE OBSERVATIONS WITH MISSING VALUES*********/
+Proc SQl;
+	create table predicted1 as
+	Select * from predicted
+	Where ATMAMT is not missing and DDABAL is not missing and DEP is not missing and phat is not missing;
+quit;
+/**** VALIDATE IF DATA WAS REMOVED****/
+proc means data=predicted1 N Nmiss;
+run;
+/***** CREATE PREDICTION WITH NEW COEFFICIENTS AS WORKING RESIDUALS****/
+data predicted1;
+	set predicted1;
+/* compute "working" residuals */
+ working = (INS - phat)/(phat*(1 - phat));
+ /*Actual coeffcient estimate from model and multiplying by variable.*/
+ respart_ATMAMT = 0.000085*ATMAMT + working;
+ respart_DDABAL = 0.000061*DDABAL + working;
+ respart_DEP = -0.2653*DEP + working;
+ run;
+/*******************PLOTS OF PARTIAL RESIDUALS TO CHECK LINEARITY**********************/
+ /* plot partial residuals we need to do this for each variable?? */
+ proc sgplot data=predicted1;
+ ODS GRAPHICS / LOESSMAXOBS=7500 ANTIALIASMAX=7500;
+ scatter x=ATMAMT y=respart_ATMAMT;
+ /* overlay smoothing line and conf limits */
+ loess x=ATMAMT y=respart_ATMAMT / clm;
+ /* overlay actual fitted line for age */
+ reg x=ATMAMT y=respart_ATMAMT / nomarkers;
+ run;
+ /* plot partial residuals we need to do this for each variable?? */
+ proc sgplot data=predicted1;
+  ODS GRAPHICS / LOESSMAXOBS=7500 ANTIALIASMAX=7500;
+ scatter x=DDABAL y=respart_DDABAL;
+ /* overlay smoothing line and conf limits */
+ loess x=DDABAL y=respart_DDABAL / clm;
+ /* overlay actual fitted line for age */
+ reg x=DDABAL y=respart_DDABAL / nomarkers;
+ run;
+ proc sgplot data=predicted;
+ scatter x=DEP y=respart_DEP;
+ /* overlay smoothing line and conf limits */
+ loess x=DEP y=respart_DEP / clm;
+ /* overlay actual fitted line for age */
+ reg x=DEP y=respart_DEP / nomarkers;
+ run;
+
+/*Generalized R-Squared*/
+proc logistic data=logistic.insurance_t plots(MAXPOINTS=NONE)=dfbetas;
+	model INS(event='1') = &FinalModVar / rsq;
+run;
+
+/*Brier Score --Unscaled*/
+proc logistic data=logistic.insurance_t plots(MAXPOINTS=NONE)=dfbetas;
+	model INS(event='1') = &FinalModVar;
+	score data=logistic.insurance_t fitstat;
+	title 'Brier Score';
+run;
+title;
+/*Create output data*/
+proc logistic data=logistic.insurance_t plots(MAXPOINTS=NONE)=dfbetas;
+	model INS(event='1') = &FinalModVar;
+	output out=predictedProbs p=phat;
+run;
+proc sort data=predictedProbs;
+	by descending /*What do we need to sort by?*/;
+run;
+/*Here we can check for coefficient of discrimination and the histograms to show if predicted probabilities are seperated*/
+proc ttest data=predictedprobs order=data;
+ods select statistics summarypanel;
+class INS;
+var phat;
+title 'coefficient of discrimination and plots';
+run;
+
+/* Stop here for trainind dataset, we will use validaiton data set after this.*/
+*Will need to do YOUDENS statistics*/
